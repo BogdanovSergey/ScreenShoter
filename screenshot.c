@@ -35,18 +35,21 @@ static void on_screenshot_ready(GObject *source, GAsyncResult *res, gpointer use
         if (error) {
             g_warning("Ошибка копирования: %s", error->message);
         } else {
-            g_print("Скриншот скопирован в: %s\n", new_path);
+            g_print("Скриншот скопирован, открываем для редактирования: %s\n", new_path);
 
+            char command[512] = "./screenshot_editor";
+            snprintf(command, sizeof(command), "./screenshot_editor %s &", new_path);
+            system(command);
         }
     }
-    //
-    system("./screenshot_editor /home/sbogdanov/Pictures/screenshot.png");
+
 
     // exit
     GApplication *app = g_application_get_default();
     if (app != NULL) {
         g_application_quit(app);
     }
+    printf("Выходим");
     exit(0);
 }
 

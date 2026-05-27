@@ -11,5 +11,6 @@ sudo apt install libportal-dev xdg-desktop-portal xdg-desktop-portal-gnome
 
 ### Compile
 ```
-gcc -Wall main.c `pkg-config --cflags --libs gtk4`;./a.out
+gcc -Wall screenshot.c `pkg-config --cflags --libs gtk4 libportal` -o screenshot;
+gcc -Wall screenshot_editor.c `pkg-config --cflags --libs gtk4 libportal` -o screenshot_editor
 ``` 
