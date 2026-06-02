@@ -83,6 +83,13 @@ static void save_callback(GtkButton *button, gpointer user_data) {
     }
 
     g_free(save_path);
+
+    GApplication *app = g_application_get_default();
+    if (app != NULL) {
+        g_application_quit(app);
+    }
+    printf("Выходим");
+    exit(0);
 }
 
 // Освобождение ресурсов
@@ -153,7 +160,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_box_append(GTK_BOX(box), drawing_area);
 
     // Кнопка сохранения
-    GtkWidget *btnSave = gtk_button_new_with_label("Сохранить");
+    GtkWidget *btnSave = gtk_button_new_with_label("Сохранить в файл и выйти");
     g_signal_connect(btnSave, "clicked", G_CALLBACK(save_callback), draw_data);
     gtk_widget_set_halign(btnSave, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(box), btnSave);
