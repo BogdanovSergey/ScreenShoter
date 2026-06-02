@@ -1,38 +1,165 @@
 #include <gtk/gtk.h>
+#include <cairo.h>
+
+typedef struct {
+    GdkPixbuf *pixbuf;
+    cairo_surface_t *surface;  // Поверхность для рисования
+    int width;
+    int height;
+    char *image_path;          // Путь к исходному файлу
+} DrawData;
+
+// Функция отрисовки для области рисования
+static void draw_function(GtkDrawingArea *area, cairo_t *cr,
+                          int width, int height, gpointer user_data) {
+    DrawData *data = (DrawData *)user_data;
+
+    if (!data->surface) {
+        return;
+    }
+
+    // Рисуем сохраненную поверхность (включая все нарисованные элементы)
+    cairo_set_source_surface(cr, data->surface, 0, 0);
+    cairo_paint(cr);
+}
+
+// Инициализация поверхности для рисования
+static void init_drawing_surface(DrawData *data) {
+    if (data->pixbuf) {
+        data->width = gdk_pixbuf_get_width(data->pixbuf);
+        data->height = gdk_pixbuf_get_height(data->pixbuf);
+
+        // Создаем поверхность того же размера, что и изображение
+        data->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+                                                   data->width,
+                                                   data->height);
+
+        // Рисуем исходное изображение на поверхность
+        cairo_t *cr = cairo_create(data->surface);
+        gdk_cairo_set_source_pixbuf(cr, data->pixbuf, 0, 0);
+        cairo_paint(cr);
+        cairo_destroy(cr);
+    }
+}
+
+// Функция для рисования прямоугольника НА ПОВЕРХНОСТИ
+static void draw_rectangle_on_surface(DrawData *data) {
+    if (!data->surface) return;
+
+    // Получаем контекст из поверхности
+    cairo_t *cr = cairo_create(data->surface);
+
+    // Рисуем прямоугольник
+    cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);  // Красный цвет
+    cairo_set_line_width(cr, 2.0);
+    cairo_rectangle(cr, 50, 50, 100, 100);
+    cairo_stroke(cr);
+
+    cairo_destroy(cr);
+}
+
+// Обработчик сохранения
+static void save_callback(GtkButton *button, gpointer user_data) {
+    DrawData *data = (DrawData *)user_data;
+
+    if (!data->surface) {
+        g_printerr("Нет данных для сохранения\n");
+        return;
+    }
+
+    // Используем путь из структуры данных
+    const char *image_path = data->image_path;
+
+    // Создаем новый путь для сохранения (можно добавить суффикс "_edited")
+    char *save_path = g_strdup_printf("%s_edited.png", image_path);
+
+    // Сохраняем поверхность в PNG файл
+    cairo_status_t status = cairo_surface_write_to_png(data->surface, save_path);
+
+    if (status == CAIRO_STATUS_SUCCESS) {
+        g_print("Изображение сохранено: %s\n", save_path);
+    } else {
+        g_printerr("Ошибка сохранения: %s\n", cairo_status_to_string(status));
+    }
+
+    g_free(save_path);
+}
+
+// Освобождение ресурсов
+static void free_draw_data(gpointer user_data) {
+    DrawData *data = (DrawData *)user_data;
+    if (data->pixbuf) {
+        g_object_unref(data->pixbuf);
+    }
+    if (data->surface) {
+        cairo_surface_destroy(data->surface);
+    }
+    if (data->image_path) {
+        g_free(data->image_path);
+    }
+    g_free(data);
+}
 
 // Обработчик активации приложения
 static void activate(GtkApplication *app, gpointer user_data) {
     const char *image_path = g_object_get_data(G_OBJECT(app), "image-path");
+
     GtkWidget *window = gtk_application_window_new(app);
-
-    char *title = g_strdup_printf("Просмотр скриншота: %s", image_path);    
-    gtk_window_set_title(GTK_WINDOW(window), title);
+    gtk_window_set_title(GTK_WINDOW(window), "Редактор скриншота");
     gtk_window_set_default_size(GTK_WINDOW(window), 900, 600);
-    g_free(title);
 
+//    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+//    gtk_widget_set_margin_start(box, 12);
+//    gtk_widget_set_margin_end(box, 12);
+//    gtk_widget_set_margin_top(box, 12);
+//    gtk_widget_set_margin_bottom(box, 12);
+    // Создаем горизонтальный бокс для картинки и области рисования
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    gtk_widget_set_margin_start(box, 12);
-    gtk_widget_set_margin_end(box, 12);
-    gtk_widget_set_margin_top(box, 12);
-    gtk_widget_set_margin_bottom(box, 12);
+    gtk_widget_set_hexpand(box, TRUE);
+    gtk_widget_set_vexpand(box, TRUE);
 
-    GtkWidget *label = gtk_label_new(image_path);
-    gtk_label_set_xalign(GTK_LABEL(label), 0.5f);
-    gtk_box_append(GTK_BOX(box), label);
+    // Загружаем изображение
+    GError *error = NULL;
+    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(image_path, &error);
+    if (!pixbuf) {
+        g_printerr("Ошибка загрузки изображения: %s\n", error->message);
+        g_error_free(error);
+        return;
+    }
 
-    GtkWidget *picture = gtk_picture_new_for_filename(image_path);
-    gtk_picture_set_can_shrink(GTK_PICTURE(picture), TRUE);
-    gtk_widget_set_hexpand(picture, TRUE);
-    gtk_widget_set_vexpand(picture, TRUE);
-    gtk_box_append(GTK_BOX(box), picture);
+    // Создаем структуру данных
+    DrawData *draw_data = g_new0(DrawData, 1);
+    draw_data->pixbuf = pixbuf;
+    draw_data->image_path = g_strdup(image_path);  // Копируем путь
 
+    // Инициализируем поверхность для рисования
+    init_drawing_surface(draw_data);
+
+    // ⚠️ ВАЖНО: Рисуем прямоугольник НА ПОВЕРХНОСТИ, а не в draw_function
+    draw_rectangle_on_surface(draw_data);
+
+    // Создаем область рисования
+    GtkWidget *drawing_area = gtk_drawing_area_new();
+    //gtk_widget_set_size_request(drawing_area, 200, -1); // Ширина 200 пикселей, высота автоматическая
+    gtk_widget_set_hexpand(drawing_area, TRUE);
+    gtk_widget_set_vexpand(drawing_area, TRUE);
+    //gtk_box_append(GTK_BOX(box), drawing_area);
+
+    // Устанавливаем функцию отрисовки
+    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area),
+                                   draw_function, draw_data,
+                                   free_draw_data);
+
+    gtk_box_append(GTK_BOX(box), drawing_area);
+
+    // Кнопка сохранения
     GtkWidget *btnSave = gtk_button_new_with_label("Сохранить");
-    g_signal_connect(btnSave, "clicked", NULL, NULL);//G_CALLBACK(take_screenshot), NULL);
+    g_signal_connect(btnSave, "clicked", G_CALLBACK(save_callback), draw_data);
     gtk_widget_set_halign(btnSave, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(box), btnSave);
 
     GtkWidget *btnCopy = gtk_button_new_with_label("Копировать");
-    g_signal_connect(btnCopy, "clicked", NULL, NULL);//G_CALLBACK(take_screenshot), NULL);
+    //g_signal_connect(btnCopy, "clicked", NULL, NULL);//G_CALLBACK(take_screenshot), NULL);
     gtk_widget_set_halign(btnCopy, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(box), btnCopy);
 
