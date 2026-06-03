@@ -107,6 +107,21 @@ static void free_draw_data(gpointer user_data) {
     g_free(data);
 }
 
+// Функция-обработчик нажатия клавиш
+static void on_key_pressed(GtkEventControllerKey *controller,
+                               guint keyval,
+                               guint keycode,
+                               GdkModifierType state,
+                               gpointer user_data) {
+    DrawData *data = (DrawData *)user_data;
+
+    if (keyval == GDK_KEY_Escape) {
+        g_print("Нажата клавиша Esc\n");
+        GtkWidget *window = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+        gtk_window_close(GTK_WINDOW(window));
+    }
+}
+
 // Обработчик активации приложения
 static void activate(GtkApplication *app, gpointer user_data) {
     const char *image_path = g_object_get_data(G_OBJECT(app), "image-path");
@@ -120,6 +135,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 //    gtk_widget_set_margin_end(box, 12);
 //    gtk_widget_set_margin_top(box, 12);
 //    gtk_widget_set_margin_bottom(box, 12);
+
     // Создаем горизонтальный бокс для картинки и области рисования
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_widget_set_hexpand(box, TRUE);
@@ -156,8 +172,15 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area),
                                    draw_function, draw_data,
                                    free_draw_data);
-
     gtk_box_append(GTK_BOX(box), drawing_area);
+
+
+
+// Добавляем контроллер клавиатуры
+    GtkEventController *key_controller = gtk_event_controller_key_new();
+    g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_key_pressed), NULL);
+    gtk_widget_add_controller(GTK_WIDGET(window), key_controller);
+
 
     // Кнопка сохранения
     GtkWidget *btnSave = gtk_button_new_with_label("Сохранить в файл и выйти");
@@ -165,6 +188,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_halign(btnSave, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(box), btnSave);
 
+    // Кнопка
     GtkWidget *btnCopy = gtk_button_new_with_label("Копировать");
     //g_signal_connect(btnCopy, "clicked", NULL, NULL);//G_CALLBACK(take_screenshot), NULL);
     gtk_widget_set_halign(btnCopy, GTK_ALIGN_END);
