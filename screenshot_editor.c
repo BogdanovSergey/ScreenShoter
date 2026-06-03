@@ -113,13 +113,23 @@ static void on_key_pressed(GtkEventControllerKey *controller,
                                guint keycode,
                                GdkModifierType state,
                                gpointer user_data) {
-    DrawData *data = (DrawData *)user_data;
+    //DrawData *data = (DrawData *)user_data;
 
     if (keyval == GDK_KEY_Escape) {
         g_print("Нажата клавиша Esc\n");
         GtkWidget *window = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
         gtk_window_close(GTK_WINDOW(window));
     }
+}
+
+static void on_mouse_pressed(GtkGestureClick *gesture,
+                             gint n_press,
+                             double x,
+                             double y,
+                             gpointer user_data) {
+
+    g_print("on_mouse_pressed\n");
+
 }
 
 // Обработчик активации приложения
@@ -174,9 +184,12 @@ static void activate(GtkApplication *app, gpointer user_data) {
                                    free_draw_data);
     gtk_box_append(GTK_BOX(box), drawing_area);
 
+    // Добавляем обработчик клика мыши
+    GtkGesture *click_gesture = gtk_gesture_click_new();
+    g_signal_connect(click_gesture, "pressed", G_CALLBACK(on_mouse_pressed), draw_data);
+    gtk_widget_add_controller(GTK_WIDGET(drawing_area), GTK_EVENT_CONTROLLER(click_gesture));
 
-
-// Добавляем контроллер клавиатуры
+    // Добавляем обработчик клавиатуры
     GtkEventController *key_controller = gtk_event_controller_key_new();
     g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_key_pressed), NULL);
     gtk_widget_add_controller(GTK_WIDGET(window), key_controller);
