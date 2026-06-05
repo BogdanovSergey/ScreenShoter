@@ -37,7 +37,7 @@ static void on_screenshot_ready(GObject *source, GAsyncResult *res, gpointer use
         } else {
             g_print("Скриншот скопирован, открываем для редактирования: %s\n", new_path);
 
-            char command[512] = "./screenshot_editor";
+            char command[512] = "./screenshot_editor"; // TODO не запустится если назначить ярлык в OS
             snprintf(command, sizeof(command), "./screenshot_editor %s &", new_path);
             system(command);
         }

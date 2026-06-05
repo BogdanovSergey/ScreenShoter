@@ -1,0 +1,21 @@
+/* Фон панелей */
+.custom-bg {
+    background-color: #e4efdb;
+}
+
+/* Скрываем индикатор радио-кнопки */
+.radio-button-style check {
+    opacity: 0;
+}
+
+/* Стиль для обычной кнопки */
+.radio-button-style {
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+/* Стиль для выбранной кнопки */
+.radio-button-style:checked {
+    background-color: #7f91a9;
+    color: white;
+}

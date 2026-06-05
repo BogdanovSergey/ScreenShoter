@@ -1,15 +1,38 @@
 #include <gtk/gtk.h>
 #include <cairo.h>
+#include <stdint.h>
 
+// Типы фигур
+typedef enum {
+    POINT,
+    LINE,
+    ARROW,
+    RECTANGLE,
+    CIRCLE
+} FigureType;
+
+// Структура фигуры
+typedef struct {
+    FigureType type;
+    double x1, y1; // Начальные координаты (в процентах от ширины/высоты или абсолютные)
+    double x2, y2; // Конечные координаты (для линий и прямоугольников)
+    double radius; // Радиус (для точек и кругов)
+    double r, g, b; // Цвет
+    double line_width; // Толщина линии
+} Figure;
+
+// Главная структура-хранилище
 typedef struct {
     GdkPixbuf *pixbuf;
     cairo_surface_t *surface;  // Поверхность для рисования
     int width;
     int height;
-    char *image_path;          // Путь к исходному файлу
+    char *image_path;       // Путь к исходному файлу
+    GArray *figures;        // массив нарисованных фигур
+    FigureType draw_mode;   // Текущая выбранная фигура для рисования
 } DrawData;
 
-// Функция отрисовки для области рисования
+// Функция отрисовки для области рисования cairo
 static void draw_function(GtkDrawingArea *area, cairo_t *cr,
                           int width, int height, gpointer user_data) {
     DrawData *data = (DrawData *)user_data;
@@ -37,13 +60,6 @@ static void init_drawing_surface(DrawData *data, int width, int height) {
     data->width = width;
     data->height = height;
 
-//    data->width = gdk_pixbuf_get_width(data->pixbuf);
-//    data->height = gdk_pixbuf_get_height(data->pixbuf);
-
-    // Создаем поверхность того же размера, что и изображение
-//    data->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-//                                               data->width,
-//                                               data->height);
     data->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
                                                width,
                                                height);
@@ -68,6 +84,8 @@ static void init_drawing_surface(DrawData *data, int width, int height) {
     int offset_x = (width - new_width) / 2;
     int offset_y = (height - new_height) / 2;
 
+
+    g_print("new_width new_height: %d x %d\n", new_width, img_height);
     // Применяем масштабирование
     cairo_scale(cr, scale, scale);
     gdk_cairo_set_source_pixbuf(cr, data->pixbuf, offset_x / scale, offset_y / scale);
@@ -77,7 +95,7 @@ static void init_drawing_surface(DrawData *data, int width, int height) {
 
 }
 
-// Функция-обработчик изменения размера
+// Функция-обработчик изменения размера gtk_widget
 static void on_drawing_area_resize(GtkDrawingArea *area,
                                    int width,
                                    int height,
@@ -179,22 +197,121 @@ static void on_mouse_pressed(GtkGestureClick *gesture,
                              double y,
                              gpointer user_data) {
 
-    g_print("on_mouse_pressed\n");
+    DrawData *data = (DrawData *)user_data;
 
+    if (!data->surface) {
+        g_printerr("Поверхность не инициализирована\n");
+        return;
+    }
+
+    g_print("Нажатие мыши: %.2f, %.2f, режим %d\n", x, y, data->draw_mode);
+
+    // Получаем контекст из поверхности для рисования
+    cairo_t *cr = cairo_create(data->surface);
+    // Настраиваем цвет точки (например, красный)
+    cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
+    // Рисуем точку (круг радиусом 5 пикселей)
+    double radius = 5.0;
+    cairo_arc(cr, x, y, radius, 0, 2 * G_PI);
+    cairo_fill(cr);
+    // Освобождаем контекст
+    cairo_destroy(cr);
+    // ⚠️ ВАЖНО: Запрашиваем перерисовку области рисования,
+    // чтобы новая точка появилась на экране
+    GtkWidget *area = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+    gtk_widget_queue_draw(area);
+
+}
+
+
+static void on_radio_toggled(GtkCheckButton *check_button, gpointer user_data) {
+    DrawData *data = (DrawData *)user_data;
+
+    // Проверяем, какая кнопка активна
+    if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_button))) {
+        const char *label = gtk_check_button_get_label(GTK_CHECK_BUTTON(check_button));
+        g_print("Выбран режим: %s\n", label);
+
+        if (g_strcmp0(label, "Точка") == 0) { // TODO вынести названия
+            data->draw_mode = POINT;
+        } else if (g_strcmp0(label, "Линия") == 0) {
+            data->draw_mode = LINE;
+        } else {
+            data->draw_mode = POINT;
+        }
+    }
 }
 
 // Обработчик активации приложения
 static void activate(GtkApplication *app, gpointer user_data) {
     const char *image_path = g_object_get_data(G_OBJECT(app), "image-path");
 
+    int8_t style_padding= 5;
+    DrawData *draw_data = g_new0(DrawData, 1);
+
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "Редактор скриншота");
     gtk_window_set_default_size(GTK_WINDOW(window), 900, 600);
 
-    // Создаем вертикальный бокс
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    gtk_widget_set_hexpand(box, TRUE);
-    gtk_widget_set_vexpand(box, TRUE);
+    // Создаем главный бокс
+    GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, style_padding);
+    gtk_widget_set_hexpand(main_box, TRUE);
+    gtk_widget_set_vexpand(main_box, TRUE);
+
+
+
+    // Верхняя панель
+    GtkWidget *toolbar_panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, style_padding);
+    gtk_widget_set_margin_start(toolbar_panel, style_padding);
+    gtk_widget_set_margin_end(toolbar_panel, style_padding);
+    gtk_widget_set_margin_top(toolbar_panel, style_padding);
+    gtk_widget_set_margin_bottom(toolbar_panel, style_padding);
+
+    // Добавляем панель  в главный бокс
+    gtk_box_append(GTK_BOX(main_box), toolbar_panel);
+
+
+    // Создаем группу радио-кнопок
+    GtkWidget *radio1 = gtk_check_button_new_with_label("Точка");  // TODO вынести названия
+    GtkWidget *radio2 = gtk_check_button_new_with_label("Линия");
+    // Добавляем CSS класс
+    gtk_widget_add_css_class(radio1, "radio-button-style");
+    gtk_widget_add_css_class(radio2, "radio-button-style");
+    // Объединяем их в одну группу (вторая кнопка присоединяется к первой)
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(radio2), GTK_CHECK_BUTTON(radio1));
+    // Устанавливаем первую кнопку как выбранную по умолчанию
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(radio1), TRUE);
+    // Добавляем обработчики сигналов
+    g_signal_connect(radio1, "toggled", G_CALLBACK(on_radio_toggled), draw_data);
+    g_signal_connect(radio2, "toggled", G_CALLBACK(on_radio_toggled), draw_data);
+    // Добавляем в панель инструментов
+    gtk_box_append(GTK_BOX(toolbar_panel), radio1);
+    gtk_box_append(GTK_BOX(toolbar_panel), radio2);
+
+
+
+    // ⚠️ Устанавливаем цвет фона через CSS
+    GtkCssProvider *css_provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_path(css_provider, "style.css");
+    gtk_style_context_add_provider_for_display(
+            gdk_display_get_default(),
+            GTK_STYLE_PROVIDER(css_provider),
+            GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+
+    //gtk_css_provider_load_from_string(css_provider, ".custom-bg { background-color: #b0b0b0; }");
+    // Применяем CSS глобально для дисплея
+//    gtk_style_context_add_provider_for_display(
+//            gdk_display_get_default(),
+//            GTK_STYLE_PROVIDER(css_provider),
+//            GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
+//    );
+
+    g_object_unref(css_provider);
+    // Добавляем CSS класс к боксу
+    gtk_widget_add_css_class(main_box, "custom-bg");
+
+
 
     // Загружаем изображение
     GError *error = NULL;
@@ -206,7 +323,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     }
 
     // Создаем структуру данных
-    DrawData *draw_data = g_new0(DrawData, 1);
+
     draw_data->pixbuf = pixbuf;
     draw_data->image_path = g_strdup(image_path);  // Копируем путь
     draw_data->surface = NULL;  // Инициализируем как NULL
@@ -227,7 +344,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
                      G_CALLBACK(on_drawing_area_resize),
                      draw_data);
 
-    gtk_box_append(GTK_BOX(box), drawing_area);
+    gtk_box_append(GTK_BOX(main_box), drawing_area);
 
     // Добавляем обработчик клика мыши
     GtkGesture *click_gesture = gtk_gesture_click_new();
@@ -239,19 +356,26 @@ static void activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_key_pressed), NULL);
     gtk_widget_add_controller(GTK_WIDGET(window), key_controller);
 
+
+
+
+    // Нижняя панель
+    GtkWidget *bottom_panel= gtk_box_new(GTK_ORIENTATION_HORIZONTAL, style_padding);
+    gtk_widget_set_margin_start(bottom_panel, style_padding);
+    gtk_widget_set_margin_end(bottom_panel, style_padding);
+    gtk_widget_set_margin_top(bottom_panel, style_padding);
+    gtk_widget_set_margin_bottom(bottom_panel, style_padding);
+    gtk_widget_set_halign(bottom_panel, GTK_ALIGN_END);
     // Кнопка сохранения
     GtkWidget *btnSave = gtk_button_new_with_label("Сохранить в файл и выйти");
     g_signal_connect(btnSave, "clicked", G_CALLBACK(save_callback), draw_data);
-    gtk_widget_set_halign(btnSave, GTK_ALIGN_END);
-    gtk_box_append(GTK_BOX(box), btnSave);
+    gtk_box_append(GTK_BOX(bottom_panel), btnSave);
+    // Добавляем панель  в главный бокс
+    gtk_box_append(GTK_BOX(main_box), bottom_panel);
 
-    // Кнопка копирования
-    GtkWidget *btnCopy = gtk_button_new_with_label("Копировать");
-    //g_signal_connect(btnCopy, "clicked", NULL, NULL);//G_CALLBACK(take_screenshot), NULL);
-    gtk_widget_set_halign(btnCopy, GTK_ALIGN_END);
-    gtk_box_append(GTK_BOX(box), btnCopy);
 
-    gtk_window_set_child(GTK_WINDOW(window), box);
+
+    gtk_window_set_child(GTK_WINDOW(window), main_box);
     gtk_window_present(GTK_WINDOW(window));
 }
 

@@ -1,5 +1,4 @@
-Linux screenshot app Readme
-
+### Linux screenshot app Readme
 
 ### How to prepare:
 ```
@@ -17,8 +16,17 @@ gcc -Wall screenshot_editor.c `pkg-config --cflags --libs gtk4 libportal` -o scr
 
 ### TODO
 
+## Features
  - [ ] insertion of arrows
+   - [x] button panel
+   - [x] dot or arrow buttons
+   - [ ] arrow/figure struct, click logic
  - [ ] insertion of rectangles
  - [ ] button "save to buffer and exit"
  - [ ] turn off form in screenshot.c 
  - [ ] create make file
+ - [ ] Logging
+
+## Bug
+ - [ ] ubuntu shortcut doesn't open editor after form
+ 
