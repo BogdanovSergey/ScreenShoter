@@ -20,9 +20,10 @@ gcc -Wall screenshot_editor.c `pkg-config --cflags --libs gtk4 libportal` -o scr
  - [ ] insertion of arrows
    - [x] button panel
    - [x] dot or arrow buttons
-   - [ ] arrow/figure struct, click logic
+   - [x] arrow/figure struct, click logic
+   - [ ] draw arrow
  - [ ] insertion of rectangles
- - [ ] button "save to buffer and exit"
+ - [ ] button "save to buffer and exit"?
  - [ ] turn off form in screenshot.c 
  - [ ] create make file
  - [ ] Logging

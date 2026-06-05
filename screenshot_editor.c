@@ -30,6 +30,9 @@ typedef struct {
     char *image_path;       // Путь к исходному файлу
     GArray *figures;        // массив нарисованных фигур
     FigureType draw_mode;   // Текущая выбранная фигура для рисования
+    bool is_drawing;    // Флаг, что рисование началось
+    double start_x, start_y; // Координаты при нажатии
+    double end_x, end_y;     // Координаты при отпускании
 } DrawData;
 
 // Функция отрисовки для области рисования cairo
@@ -196,15 +199,22 @@ static void on_mouse_pressed(GtkGestureClick *gesture,
                              double x,
                              double y,
                              gpointer user_data) {
-
     DrawData *data = (DrawData *)user_data;
-
     if (!data->surface) {
         g_printerr("Поверхность не инициализирована\n");
         return;
     }
 
-    g_print("Нажатие мыши: %.2f, %.2f, режим %d\n", x, y, data->draw_mode);
+    g_print("Нажал мышь: %.2f, %.2f, режим %d\n", x, y, data->draw_mode);
+    data->start_x = x;
+    data->start_y = y;
+    data->is_drawing = TRUE;
+
+    if(data->draw_mode == POINT) {
+        g_print("WILL draw POINT\n");
+    } else if(data->draw_mode == LINE) {
+        g_print("WILL draw LINE\n");
+    }
 
     // Получаем контекст из поверхности для рисования
     cairo_t *cr = cairo_create(data->surface);
@@ -222,6 +232,23 @@ static void on_mouse_pressed(GtkGestureClick *gesture,
     gtk_widget_queue_draw(area);
 
 }
+static void on_mouse_released(GtkGestureClick *gesture,
+                             gint n_press,
+                             double x,
+                             double y,
+                             gpointer user_data) {
+    DrawData *data = (DrawData *)user_data;
+    if (!data->surface) {
+        g_printerr("Поверхность не инициализирована\n");
+        return;
+    }
+
+    g_print("Отпустил мышь: %.2f, %.2f, режим %d\n", x, y, data->draw_mode);
+    data->end_x = x;
+    data->end_y = y;
+    data->is_drawing = FALSE;
+
+}
 
 
 static void on_radio_toggled(GtkCheckButton *check_button, gpointer user_data) {
@@ -234,7 +261,7 @@ static void on_radio_toggled(GtkCheckButton *check_button, gpointer user_data) {
 
         if (g_strcmp0(label, "Точка") == 0) { // TODO вынести названия
             data->draw_mode = POINT;
-        } else if (g_strcmp0(label, "Линия") == 0) {
+        } else if (g_strcmp0(label, "Стрелка") == 0) {
             data->draw_mode = LINE;
         } else {
             data->draw_mode = POINT;
@@ -273,7 +300,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     // Создаем группу радио-кнопок
     GtkWidget *radio1 = gtk_check_button_new_with_label("Точка");  // TODO вынести названия
-    GtkWidget *radio2 = gtk_check_button_new_with_label("Линия");
+    GtkWidget *radio2 = gtk_check_button_new_with_label("Стрелка");
     // Добавляем CSS класс
     gtk_widget_add_css_class(radio1, "radio-button-style");
     gtk_widget_add_css_class(radio2, "radio-button-style");
@@ -349,6 +376,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // Добавляем обработчик клика мыши
     GtkGesture *click_gesture = gtk_gesture_click_new();
     g_signal_connect(click_gesture, "pressed", G_CALLBACK(on_mouse_pressed), draw_data);
+    g_signal_connect(click_gesture, "released", G_CALLBACK(on_mouse_released), draw_data);
     gtk_widget_add_controller(GTK_WIDGET(drawing_area), GTK_EVENT_CONTROLLER(click_gesture));
 
     // Добавляем обработчик клавиатуры
