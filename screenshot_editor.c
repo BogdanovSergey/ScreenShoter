@@ -250,6 +250,18 @@ static void on_mouse_released(GtkGestureClick *gesture,
 
 }
 
+static void on_mouse_move(GtkEventControllerMotion *controller,
+                           double x,
+                           double y,
+                           gpointer user_data)
+{
+    DrawData *data = (DrawData *)user_data;
+    // Здесь можно обновлять координаты для preview линии/прямоугольника
+    // и вызывать gtk_widget_queue_draw() для перерисовки
+    if(!data->is_drawing) return;
+
+    g_print("on_mouse_move: %.2f, %.2f\n", x, y);
+}
 
 static void on_radio_toggled(GtkCheckButton *check_button, gpointer user_data) {
     DrawData *data = (DrawData *)user_data;
@@ -378,6 +390,11 @@ static void activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(click_gesture, "pressed", G_CALLBACK(on_mouse_pressed), draw_data);
     g_signal_connect(click_gesture, "released", G_CALLBACK(on_mouse_released), draw_data);
     gtk_widget_add_controller(GTK_WIDGET(drawing_area), GTK_EVENT_CONTROLLER(click_gesture));
+
+    // Добавляем обработку движения мыши
+    GtkEventController *motion_controller = gtk_event_controller_motion_new();
+    g_signal_connect(motion_controller, "motion", G_CALLBACK(on_mouse_move), draw_data);
+    gtk_widget_add_controller(GTK_WIDGET(drawing_area), motion_controller);
 
     // Добавляем обработчик клавиатуры
     GtkEventController *key_controller = gtk_event_controller_key_new();
