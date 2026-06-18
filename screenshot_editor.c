@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <cairo.h>
 #include <stdint.h>
+#include <math.h>
 
 // Типы фигур
 typedef enum {
@@ -47,6 +48,51 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr,
     // Рисуем сохраненную поверхность (включая все нарисованные элементы)
     cairo_set_source_surface(cr, data->surface, 0, 0);
     cairo_paint(cr);
+}
+
+// Рисование стрелки
+// Функция для рисования стрелки на поверхности
+static void draw_arrow_on_surface(GtkGestureClick *gesture, DrawData *data, double x1, double y1, double x2, double y2) {
+    if (!data->surface) return;
+
+    // Получаем контекст из поверхности
+    cairo_t *cr = cairo_create(data->surface);
+
+    // Настраиваем цвет и толщину линии
+    cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);  // Красный цвет
+    cairo_set_line_width(cr, 2.0);
+
+    // Рисуем основную линию
+    cairo_move_to(cr, x1, y1);
+    cairo_line_to(cr, x2, y2);
+    cairo_stroke(cr);
+
+    // Параметры стрелки
+    double arrow_length = 15.0;  // Длина "ушек" стрелки
+    double arrow_angle = M_PI / 6.0;  // Угол между линией и "ушком" (30 градусов)
+
+    // Вычисляем угол основной линии
+    double angle = atan2(y2 - y1, x2 - x1);
+
+    // Рисуем левое "ушко" стрелки
+    cairo_move_to(cr, x2, y2);
+    cairo_line_to(cr,
+                  x2 - arrow_length * cos(angle - arrow_angle),
+                  y2 - arrow_length * sin(angle - arrow_angle));
+    cairo_stroke(cr);
+
+    // Рисуем правое "ушко" стрелки
+    cairo_move_to(cr, x2, y2);
+    cairo_line_to(cr,
+                  x2 - arrow_length * cos(angle + arrow_angle),
+                  y2 - arrow_length * sin(angle + arrow_angle));
+    cairo_stroke(cr);
+
+    // Освобождаем контекст
+    cairo_destroy(cr);
+    // Запрашиваем перерисовку области рисования, чтобы новая точка появилась на экране
+    GtkWidget *area = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+    gtk_widget_queue_draw(area);
 }
 
 // Инициализация поверхности для рисования
@@ -210,24 +256,27 @@ static void on_mouse_pressed(GtkGestureClick *gesture,
     data->start_y = y;
     data->is_drawing = TRUE;
 
-    if(data->draw_mode == POINT) {
-        g_print("WILL draw POINT\n");
-    } else if(data->draw_mode == LINE) {
-        g_print("WILL draw LINE\n");
-    }
-
     // Получаем контекст из поверхности для рисования
     cairo_t *cr = cairo_create(data->surface);
     // Настраиваем цвет точки (например, красный)
     cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
-    // Рисуем точку (круг радиусом 5 пикселей)
-    double radius = 5.0;
-    cairo_arc(cr, x, y, radius, 0, 2 * G_PI);
-    cairo_fill(cr);
+
+    if(data->draw_mode == POINT) {
+        g_print("Drawing POINT\n");
+
+        // Рисуем точку (круг радиусом 5 пикселей)
+        double radius = 5.0;
+        cairo_arc(cr, x, y, radius, 0, 2 * G_PI);
+        cairo_fill(cr);
+
+    } else if(data->draw_mode == LINE) {
+        g_print("Drawing LINE\n");
+    }
+
+
     // Освобождаем контекст
     cairo_destroy(cr);
-    // ⚠️ ВАЖНО: Запрашиваем перерисовку области рисования,
-    // чтобы новая точка появилась на экране
+    // Запрашиваем перерисовку области рисования, чтобы новая точка появилась на экране
     GtkWidget *area = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
     gtk_widget_queue_draw(area);
 
@@ -248,6 +297,10 @@ static void on_mouse_released(GtkGestureClick *gesture,
     data->end_y = y;
     data->is_drawing = FALSE;
 
+    if(data->draw_mode == LINE) {
+        draw_arrow_on_surface(gesture,data, data->start_x, data->start_y, data->end_x, data->end_y);
+
+    }
 }
 
 static void on_mouse_move(GtkEventControllerMotion *controller,
