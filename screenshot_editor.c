@@ -22,7 +22,7 @@ typedef struct {
     double line_width; // Толщина линии
 } Figure;
 
-// Главная структура-хранилище
+// Главная текущая структура
 typedef struct {
     GdkPixbuf *pixbuf;
     cairo_surface_t *surface;  // Поверхность для рисования
@@ -35,6 +35,11 @@ typedef struct {
     double start_x, start_y; // Координаты при нажатии
     double end_x, end_y;     // Координаты при отпускании
 } DrawData;
+
+// Структура хранилище фигур
+typedef struct {
+
+} DrawArray;
 
 // Функция отрисовки для области рисования cairo
 static void draw_function(GtkDrawingArea *area, cairo_t *cr,
