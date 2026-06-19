@@ -28,7 +28,8 @@ gcc -Wall screenshot_editor.c `pkg-config --cflags --libs gtk4 libportal` -lm -o
  - [ ] turn off form in screenshot.c 
  - [ ] create make file
  - [ ] Logging
+ - [ ] increment new filenames
 
 ## Bug
- - [ ] ubuntu shortcut doesn't open editor after form
+ - [x] ubuntu shortcut doesn't open editor after form
  
